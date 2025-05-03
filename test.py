@@ -11,12 +11,12 @@ import numpy as np
 
 
 if __name__ == "__main__":
-    basedir = os.path.join('.', 'examples')
+    basedir = os.path.join('.', 'map')
 
     # Read and convert images to grayscale, then to numpy arrays
-    im0 = Image.open(os.path.join(basedir, "sample1.png")).convert('L')
-    im1 = Image.open(os.path.join(basedir, "sample3.png")).convert('L')
-
+    # From the PIL documentation ‘L’ (8-bit pixels, black and white)
+    im0 = Image.open(os.path.join(basedir, "a_1.jpg")).convert('L')
+    im1 = Image.open(os.path.join(basedir, "b_1.jpg")).convert('L')
     im0_array = np.array(im0)
     im1_array = np.array(im1)
 
