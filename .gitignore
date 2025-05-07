@@ -1,3 +1,6 @@
+.DS_Store
 _imreg_dft/
 __pycache__/
-example_img/
+maps/
+maps_cropped_*/
+test_*/
