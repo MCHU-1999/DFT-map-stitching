@@ -692,10 +692,10 @@ def imshow(im0, im1, im2, cmap=None, fig=None, **kwargs):
     Returns:
         matplotlib figure: The figure with subplots
     """
-    from matplotlib import pyplot
+    import matplotlib.pyplot as plt
 
     if fig is None:
-        fig = pyplot.figure()
+        fig = plt.figure(figsize=(10, 10))
     if cmap is None:
         cmap = 'coolwarm'
     # We do the difference between the template and the result now
@@ -707,17 +707,37 @@ def imshow(im0, im1, im2, cmap=None, fig=None, **kwargs):
     if phase_norm != 0:
         norm *= np.exp(1j * phase_norm)
     im3 = abs(im2 - im0 * norm)
+
     pl0 = fig.add_subplot(221)
     pl0.imshow(im0.real, cmap, **kwargs)
     pl0.grid()
+    pl0.set_title("image 1")
+    pl0.set_xticklabels([])
+    pl0.set_yticklabels([])
+
     share = dict(sharex=pl0, sharey=pl0)
+
     pl = fig.add_subplot(222, **share)
     pl.imshow(im1.real, cmap, **kwargs)
     pl.grid()
+    pl.set_title("image 2")
+    pl.set_xticklabels([])
+    pl.set_yticklabels([])
+
     pl = fig.add_subplot(223, **share)
-    pl.imshow(im3, cmap, **kwargs)
+    pl.imshow(im3, cmap='coolwarm', **kwargs)
     pl.grid()
+    pl.set_title("difference")
+    pl.set_xticklabels([])
+    pl.set_yticklabels([])
+
     pl = fig.add_subplot(224, **share)
     pl.imshow(im2.real, cmap, **kwargs)
     pl.grid()
+    pl.set_title("transformed")
+    pl.set_xticklabels([])
+    pl.set_yticklabels([])
+
+    plt.tight_layout()
+
     return fig
