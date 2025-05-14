@@ -1,10 +1,11 @@
 from PIL import Image
 import os
 
-# Folder with original 50x50 images
-input_folder = 'maps_cropped_50px'   
-# Folder to save cropped 30x30 images
-output_folder = 'maps_cropped_30px' 
+
+input_folder = 'maps_cropped_100px'   
+output_folder = 'maps_cropped_20px' 
+orig_size = 100
+new_size = 20
 
 # Create output folder if it doesn't exist
 os.makedirs(output_folder, exist_ok=True)
@@ -15,15 +16,15 @@ for filename in os.listdir(input_folder):
         img = Image.open(img_path)
 
         # Ensure image is 50x50
-        if img.size != (50, 50):
+        if img.size != (orig_size, orig_size):
             print(f"Skipping {filename}: not 50x50")
             continue
 
-        # Compute box for centered 30x30 crop
-        left = (50 - 30) // 2
-        top = (50 - 30) // 2
-        right = left + 30
-        bottom = top + 30
+        # Compute box for centered crop
+        left = (orig_size - new_size) // 2
+        top = (orig_size - new_size) // 2
+        right = left + new_size
+        bottom = top + new_size
         cropped_img = img.crop((left, top, right, bottom))
 
         # Save to output folder with same filename
