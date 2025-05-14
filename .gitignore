@@ -3,5 +3,6 @@ _imreg_dft/
 __pycache__/
 maps/
 maps_cropped_*/
+maps_1832_cropped_50px/
 test_*/
 test.py
