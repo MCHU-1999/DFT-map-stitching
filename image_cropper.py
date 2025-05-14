@@ -4,9 +4,10 @@ from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import QPixmap, QPainter
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QFileDialog, QPushButton
 
-OUTPUT_DIR = "maps_cropped"
+OUTPUT_DIR = "maps_cropped_100px"
 IMG_A = "a"
 IMG_B = "b"
+SIZE = 100
 
 class ImageViewer(QGraphicsView):
     def __init__(self, image_path, name_label, parent_callback):
@@ -23,7 +24,7 @@ class ImageViewer(QGraphicsView):
         self.setRenderHint(QPainter.SmoothPixmapTransform)
 
         self.scale_factor = 1.0
-        self.min_scale = 0.2
+        self.min_scale = 0.1
         self.max_scale = 5.0
 
         self._mouse_pressed = False
@@ -35,7 +36,7 @@ class ImageViewer(QGraphicsView):
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
-        zoom_step = 0.02
+        zoom_step = 0.01
         old_scale = self.scale_factor
 
         if delta > 0 and self.scale_factor < self.max_scale:
@@ -129,7 +130,7 @@ class MainWindow(QMainWindow):
             self.viewer_b.selected_point = None
 
     def save_crops(self):
-        crop_size = 50
+        crop_size = SIZE
         half = crop_size / 2
 
         # Create folders
