@@ -1,8 +1,13 @@
+# Mac 
 .DS_Store
-_imreg_dft/
+
+# Cache
 __pycache__/
-maps/
-maps_cropped_*/
-maps_1832_cropped_50px/
-test_*/
-test.py
+
+# No need
+plots/
+data_eval/*
+data_test/*
+result_eval/**/*.png
+effect_demo_1.py
+effect_demo_2.py
