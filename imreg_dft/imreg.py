@@ -45,9 +45,7 @@ try:
 except ImportError:
     import numpy.fft as fft
 import scipy.ndimage.interpolation as ndii
-
 import imreg_dft.utils as utils
-
 
 def _logpolar_filter(shape):
     """
@@ -95,13 +93,11 @@ def _get_ang_scale(ims, bgval, exponent='inf', constraints=None, reports=None):
     filt = _logpolar_filter(shape)
     dfts = [dft * filt for dft in dfts]
 
-    # High-pass filtering used to be here, but we have moved it to a higher
-    # level interface
+    # High-pass filtering used to be here, but we have moved it to a higher level interface
 
     pcorr_shape = _get_pcorr_shape(shape)
     log_base = _get_log_base(shape, pcorr_shape[1])
-    stuffs = [_logpolar(np.abs(dft), pcorr_shape, log_base)
-              for dft in dfts]
+    stuffs = [_logpolar(np.abs(dft), pcorr_shape, log_base) for dft in dfts]
 
     (arg_ang, arg_rad), success = _phase_correlation(
         stuffs[0], stuffs[1],
@@ -237,7 +233,7 @@ def _get_precision(shape, scale=1):
 
 
 def _similarity(im0, im1, numiter=1, order=3, constraints=None,
-                filter_pcorr=0, exponent='inf', bgval=None, reports=None):
+                filter_pcorr=0, exponent='inf', bgval=None, reports=None, use_scale=False):
     """
     This function takes some input and returns mutual rotation, scale
     and translation.
@@ -285,13 +281,20 @@ def _similarity(im0, im1, numiter=1, order=3, constraints=None,
         reports["after_tform"] = [im2.copy()]
 
     for ii in range(numiter):
-        newscale, newangle = _get_ang_scale([im0, im2], bgval, exponent,
-                                            constraints_dynamic, reports)
-        scale *= newscale
-        angle += newangle
+        if use_scale:
+            newscale, newangle = _get_ang_scale([im0, im2], bgval, exponent,
+                                                constraints_dynamic, reports)
+            scale *= newscale
+            angle += newangle
 
-        constraints_dynamic["scale"][0] /= newscale
-        constraints_dynamic["angle"][0] -= newangle
+            constraints_dynamic["scale"][0] /= newscale
+            constraints_dynamic["angle"][0] -= newangle
+        else:
+            _, newangle = _get_ang_scale([im0, im2], bgval, exponent,
+                                                constraints_dynamic, reports)
+            angle += newangle
+
+            constraints_dynamic["angle"][0] -= newangle
 
         im2 = transform_img(im1, scale, angle, bgval=bgval, order=order)
 
@@ -299,8 +302,9 @@ def _similarity(im0, im1, numiter=1, order=3, constraints=None,
             reports["after_tform"].append(im2.copy())
 
     # Here we look how is the turn-180
-    target, stdev = constraints.get("angle", (0, None))
-    odds = _get_odds(angle, target, stdev)
+    # target, stdev = constraints.get("angle", (0, None))
+    # odds = _get_odds(angle, target, stdev)
+    odds = _get_odds_compare_simple_diff(im0, im2, bgval, order)
 
     # now we can use pcorr to guess the translation
     res = translation(im0, im2, filter_pcorr, odds,
@@ -373,10 +377,11 @@ def similarity(im0, im1, numiter=1, order=3, constraints=None,
         * No subpixel precision (but you can use *resampling* to get
           around this).
     """
-    bgval = utils.get_borderval(im1, 5)
+    # bgval = utils.get_borderval(im1, 5)
+    bgval = 0
 
     res = _similarity(im0, im1, numiter, order, constraints,
-                      filter_pcorr, exponent, bgval, reports)
+                      filter_pcorr, exponent, bgval, reports, False)
 
     im2 = transform_img_dict(im1, res, bgval, order)
     # Order of mask should be always 1 - higher values produce strange results.
@@ -424,6 +429,38 @@ def _get_odds(angle, target, stdev):
         else:
             ret = odds1 / odds0
     return ret
+
+def _get_odds_compare_simple_diff(im0, im1, bgval=None, order=3):
+    """
+    Simple difference-based comparison: choose the transformation with smaller difference.
+    
+    Args:
+        im0 (np.array): Reference image
+        im1 (np.array): Image to transform
+        bgval: Background value
+        order (int): Interpolation order
+        
+    Returns:
+        float: Odds ratio. >1 means choose angle+180°, <1 means keep original
+    """
+    if bgval is None:
+        bgval = utils.get_borderval(im1, 5)
+
+    im1_orig = im1
+    im1_180 = transform_img(im1, 1, 180, bgval=bgval, order=order)
+    
+    # Calculate differences
+    diff_orig = np.mean(np.abs(im0 - im1_orig))  # Mean Absolute Error
+    diff_180 = np.mean(np.abs(im0 - im1_180))
+    
+    print(f"Difference comparison: orig={diff_orig:.4f}, 180°={diff_180:.4f}")
+    
+    # Return odds: higher means prefer 180° version
+    # If diff_180 < diff_orig, we want odds > 1
+    if diff_180 > 0:
+        return diff_orig / diff_180  # Higher when diff_orig > diff_180
+    else:
+        return float('inf')  # Perfect match with 180° version
 
 
 def _translation(im0, im1, filter_pcorr=0, constraints=None, reports=None):
@@ -665,79 +702,284 @@ def _logpolar(image, shape, log_base, bgval=None):
     return output
 
 
-def imshow(im0, im1, im2, cmap=None, fig=None, **kwargs):
+# def imshow(im0, im1, im2, cmap=None, fig=None, title="Pair 1", subtitle=True, **kwargs):
+#     """
+#     Plot images using matplotlib.
+#     Opens a new figure with four subplots:
+
+#     ::
+
+#       +----------------------+---------------------+----------------------+----------------------+
+#       |                      |                     |                      | <difference between  |
+#       |   <template image>   |   <subject image>   | <transformed subject>|  template and the    |
+#       |                      |                     |                      | transformed subject> |
+#       +----------------------+---------------------+----------------------+----------------------+
+
+#     Args:
+#         im0 (np.ndarray): The template image
+#         im1 (np.ndarray): The subject image
+#         im2: The transformed subject --- it is supposed to match the template
+#         cmap (optional): colormap
+#         fig (optional): The figure you would like to have this plotted on
+
+#     Returns:
+#         matplotlib figure: The figure with subplots
+#     """
+#     import matplotlib.pyplot as plt
+
+#     if fig is None:
+#         fig = plt.figure(figsize=(15, 3))
+#     if cmap is None:
+#         cmap = 'coolwarm'
+
+#     # We do the difference between the template and the result now
+#     # To increase the contrast of the difference, we norm images according
+#     # to their near-maximums
+#     norm = np.percentile(np.abs(im2), 99.5) / np.percentile(np.abs(im0), 99.5)
+#     # Divide by zero is OK here
+#     phase_norm = np.median(np.angle(im2 / im0) % (2 * np.pi))
+#     if phase_norm != 0:
+#         norm *= np.exp(1j * phase_norm)
+#     im3 = abs(im2 - im0 * norm)
+    
+#     # tick setting
+#     N_TICKS = (im0.shape[0] // 5)
+
+#     # First subplot: Title only
+#     pl_title = fig.add_subplot(151)
+#     pl_title.text(0.5, 0.5, title, fontsize=20,
+#                   horizontalalignment='center', verticalalignment='center',
+#                   transform=pl_title.transAxes, wrap=True)
+#     pl_title.axis('off')
+#     # if subtitle : pl_title.set_title("Pair no.")
+
+#     # 2nd
+#     pl0 = fig.add_subplot(152)
+#     pl0.imshow(im0.real, cmap, **kwargs)
+
+#     xlim = pl0.get_xlim()
+#     ylim = pl0.get_ylim()
+#     xticks = np.linspace(xlim[0], xlim[1], N_TICKS + 1)
+#     yticks = np.linspace(ylim[0], ylim[1], N_TICKS + 1)
+
+#     pl0.set_xticks(xticks)
+#     pl0.set_yticks(yticks)
+#     pl0.grid()
+#     # if subtitle : pl0.set_title("image 1")
+#     pl0.set_xticklabels([])
+#     pl0.set_yticklabels([])
+
+#     share = dict(sharex=pl0, sharey=pl0)
+
+#     # 3rd
+#     pl = fig.add_subplot(153, **share)
+#     pl.imshow(im1.real, cmap, **kwargs)
+#     pl.set_xticks(xticks)
+#     pl.set_yticks(yticks)
+#     pl.grid()
+#     # if subtitle : pl.set_title("image 2")
+#     pl.set_xticklabels([])
+#     pl.set_yticklabels([])
+
+#     # 4th
+#     pl = fig.add_subplot(154, **share)
+#     pl.imshow(im2.real, cmap, **kwargs)
+#     pl.set_xticks(xticks)
+#     pl.set_yticks(yticks)
+#     pl.grid()
+#     # if subtitle : pl.set_title("transformed")
+#     pl.set_xticklabels([])
+#     pl.set_yticklabels([])
+
+#     # 5th
+#     pl = fig.add_subplot(155, **share)
+#     pl.imshow(im3, cmap='coolwarm', **kwargs)
+#     pl.set_xticks(xticks)
+#     pl.set_yticks(yticks)
+#     pl.grid()
+#     # if subtitle : pl.set_title("difference")
+#     pl.set_xticklabels([])
+#     pl.set_yticklabels([])
+
+#     plt.tight_layout()
+
+#     return fig
+
+
+def imshow(im0, im1, im2, cmap=None, fig=None, title="Pair 1", subtitle=True, show_spectrum=True, **kwargs):
     """
-    Plot images using matplotlib.
-    Opens a new figure with four subplots:
+    Plot images and their frequency spectra using matplotlib.
+    Opens a new figure with subplots showing spatial and frequency domain representations:
 
-    ::
+    If show_spectrum=False (spatial domain only):
+    +---------------------+----------------------+----------------------+----------------------+
+    |   <template image>  |   <subject image>    | <transformed subject>| <difference between  |
+    |                     |                      |                      |  template and the    |
+    |                     |                      |                      | transformed subject> |
+    +---------------------+----------------------+----------------------+----------------------+
 
-      +----------------------+---------------------+
-      |                      |                     |
-      |   <template image>   |   <subject image>   |
-      |                      |                     |
-      +----------------------+---------------------+
-      | <difference between  |                     |
-      |  template and the    |<transformed subject>|
-      | transformed subject> |                     |
-      +----------------------+---------------------+
+    If show_spectrum=True (spatial + frequency domain):
+    +---------------------+----------------------+----------------------+----------------------+---------------------+----------------------+----------------------+
+    |   <template image>  |   <subject image>    | <transformed subject>| <difference between  | <template spectrum> | <subject spectrum>   |<transformed spectrum>|
+    |                     |                      |                      |  template and the    |                     |                      |                      |
+    |                     |                      |                      | transformed subject> |                     |                      |                      |
+    +---------------------+----------------------+----------------------+----------------------+---------------------+----------------------+----------------------+
 
     Args:
         im0 (np.ndarray): The template image
-        im1 (np.ndarray): The subject image
-        im2: The transformed subject --- it is supposed to match the template
-        cmap (optional): colormap
+        im1 (np.ndarray): The subject image  
+        im2 (np.ndarray): The transformed subject --- it is supposed to match the template
+        cmap (optional): colormap for spatial domain images
         fig (optional): The figure you would like to have this plotted on
+        title (str): Title for the entire figure
+        subtitle (bool): Whether to show subplot titles
+        show_spectrum (bool): Whether to show frequency domain representations
+        **kwargs: Additional arguments passed to imshow
 
     Returns:
         matplotlib figure: The figure with subplots
     """
     import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Determine figure size and subplot configuration
+    if show_spectrum:
+        figsize = (21, 3.5)  # Wider for 7 columns
+        n_rows = 1
+        subplot_base = 170  # 1 row, 7 columns
+    else:
+        figsize = (15, 3.5)
+        n_rows = 1
+        subplot_base = 140  # 1 row, 4 columns
 
     if fig is None:
-        fig = plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=figsize)
+    
+    # Set the main title using suptitle instead of a dedicated subplot
+    fig.text(0.01, 0.5, title, rotation=90, verticalalignment='center', 
+                fontsize=20, fontweight='bold')
+
     if cmap is None:
         cmap = 'coolwarm'
-    # We do the difference between the template and the result now
-    # To increase the contrast of the difference, we norm images according
-    # to their near-maximums
+
+    # Compute difference image with normalization
     norm = np.percentile(np.abs(im2), 99.5) / np.percentile(np.abs(im0), 99.5)
-    # Divide by zero is OK here
     phase_norm = np.median(np.angle(im2 / im0) % (2 * np.pi))
     if phase_norm != 0:
         norm *= np.exp(1j * phase_norm)
     im3 = abs(im2 - im0 * norm)
+    
+    # Compute frequency domain representations (FFT)
+    def compute_spectrum(image):
+        """Compute log magnitude spectrum of image"""
+        fft = np.fft.fftshift(np.fft.fft2(image))
+        spectrum = np.log(np.abs(fft) + 1e-10)  # Add small value to avoid log(0)
+        return spectrum
+    
+    spectrum0 = compute_spectrum(im0)
+    spectrum1 = compute_spectrum(im1) 
+    spectrum2 = compute_spectrum(im2)
+    
+    # Tick settings
+    N_TICKS = (im0.shape[0] // 5)
 
-    pl0 = fig.add_subplot(221)
-    pl0.imshow(im0.real, cmap, **kwargs)
-    pl0.grid()
-    pl0.set_title("image 1")
-    pl0.set_xticklabels([])
-    pl0.set_yticklabels([])
+    # === SPATIAL DOMAIN PLOTS (top row) ===
+    
+    # Template image
+    ax1 = fig.add_subplot(subplot_base + 1)
+    im_plot1 = ax1.imshow(im0.real, cmap, **kwargs)
+    
+    xlim = ax1.get_xlim()
+    ylim = ax1.get_ylim()
+    xticks = np.linspace(xlim[0], xlim[1], N_TICKS + 1)
+    yticks = np.linspace(ylim[0], ylim[1], N_TICKS + 1)
+    
+    ax1.set_xticks(xticks)
+    ax1.set_yticks(yticks)
+    ax1.grid()
+    if subtitle:
+        ax1.set_title("im0", fontsize=16)
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    # ax1.set_ylabel("Images", rotation=90, labelpad=10)
 
-    share = dict(sharex=pl0, sharey=pl0)
+    share = dict(sharex=ax1, sharey=ax1)
 
-    pl = fig.add_subplot(222, **share)
-    pl.imshow(im1.real, cmap, **kwargs)
-    pl.grid()
-    pl.set_title("image 2")
-    pl.set_xticklabels([])
-    pl.set_yticklabels([])
+    # Subject image
+    ax2 = fig.add_subplot(subplot_base + 2, **share)
+    ax2.imshow(im1.real, cmap, **kwargs)
+    ax2.set_xticks(xticks)
+    ax2.set_yticks(yticks)
+    ax2.grid()
+    if subtitle:
+        ax2.set_title("im1", fontsize=16)
+    ax2.set_xticklabels([])
+    ax2.set_yticklabels([])
 
-    pl = fig.add_subplot(223, **share)
-    pl.imshow(im3, cmap='coolwarm', **kwargs)
-    pl.grid()
-    pl.set_title("difference")
-    pl.set_xticklabels([])
-    pl.set_yticklabels([])
+    # Transformed subject
+    ax3 = fig.add_subplot(subplot_base + 3, **share)
+    ax3.imshow(im2.real, cmap, **kwargs)
+    ax3.set_xticks(xticks)
+    ax3.set_yticks(yticks)
+    ax3.grid()
+    if subtitle:
+        ax3.set_title("im1 transformed", fontsize=16)
+    ax3.set_xticklabels([])
+    ax3.set_yticklabels([])
 
-    pl = fig.add_subplot(224, **share)
-    pl.imshow(im2.real, cmap, **kwargs)
-    pl.grid()
-    pl.set_title("transformed")
-    pl.set_xticklabels([])
-    pl.set_yticklabels([])
+    # Difference
+    ax4 = fig.add_subplot(subplot_base + 4, **share)
+    ax4.imshow(im3, cmap='coolwarm', **kwargs)
+    ax4.set_xticks(xticks)
+    ax4.set_yticks(yticks)
+    ax4.grid()
+    if subtitle:
+        ax4.set_title("difference", fontsize=16)
+    ax4.set_xticklabels([])
+    ax4.set_yticklabels([])
+
+    # === FREQUENCY DOMAIN PLOTS (bottom row) ===
+    if show_spectrum:
+        # Template spectrum
+        ax5 = fig.add_subplot(subplot_base + 5)
+        ax5.imshow(spectrum0, cmap='viridis', **kwargs)
+        ax5.set_xticks(xticks)
+        ax5.set_yticks(yticks)
+        ax5.grid()
+        if subtitle:
+            ax5.set_title("im0 spectrum", fontsize=16)
+        ax5.set_xticklabels([])
+        ax5.set_yticklabels([])
+        # ax5.set_ylabel("Frequency Domain", rotation=90, labelpad=10)
+
+        share_freq = dict(sharex=ax5, sharey=ax5)
+
+        # Subject spectrum
+        ax6 = fig.add_subplot(subplot_base + 6, **share_freq)
+        ax6.imshow(spectrum1, cmap='viridis', **kwargs)
+        ax6.set_xticks(xticks)
+        ax6.set_yticks(yticks)
+        ax6.grid()
+        if subtitle:
+            ax6.set_title("im1 spectrum", fontsize=16)
+        ax6.set_xticklabels([])
+        ax6.set_yticklabels([])
+
+        # Transformed spectrum
+        ax7 = fig.add_subplot(subplot_base + 7, **share_freq)
+        ax7.imshow(spectrum2, cmap='viridis', **kwargs)
+        ax7.set_xticks(xticks)
+        ax7.set_yticks(yticks)
+        ax7.grid()
+        if subtitle:
+            ax7.set_title("im1 transformed spectrum", fontsize=16)
+        ax7.set_xticklabels([])
+        ax7.set_yticklabels([])
 
     plt.tight_layout()
+    
+    # Adjust layout to accommodate suptitle
+    plt.subplots_adjust(left=0.03, wspace=0.03)
 
     return fig
+
