@@ -3,12 +3,6 @@ import numpy as np
 from scipy.ndimage import rotate, shift, convolve, laplace, gaussian_filter
 from scipy.signal.windows import tukey, hann
 
-
-basedir = os.path.join('.', 'maps_cropped_100px')
-output_dir = "test_100px"
-os.makedirs(output_dir, exist_ok=True)
-
-
 def pad_bg_value(image, size):
     # Ensure size is a tuple (new_h, new_w)
     if isinstance(size, int):
