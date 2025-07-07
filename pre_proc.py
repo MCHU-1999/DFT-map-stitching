@@ -3,6 +3,43 @@ import numpy as np
 from scipy.ndimage import rotate, shift, convolve, laplace, gaussian_filter
 from scipy.signal.windows import tukey, hann
 
+def center_crop(image, crop_size):
+    orig_size = image.shape[0]  # Assuming square image
+    
+    # Compute box for centered crop
+    left = (orig_size - crop_size) // 2
+    top = (orig_size - crop_size) // 2
+    right = left + crop_size
+    bottom = top + crop_size
+    
+    # Crop the image
+    cropped = image[top:bottom, left:right]
+    
+    return cropped
+
+def denoise_blur(image, sigma=1.0):    
+    # Handle different input types and preserve original dtype
+    original_dtype = image.dtype
+    
+    # Convert to float for processing if needed
+    if image.dtype != np.float64:
+        image_float = image.astype(np.float64)
+    else:
+        image_float = image.copy()
+    
+    # Apply Gaussian filter
+    denoised = gaussian_filter(image_float, sigma=sigma)
+
+    # Convert back to original dtype
+    if original_dtype == np.uint8:
+        denoised = np.clip(denoised, 0, 255).astype(np.uint8)
+    elif original_dtype == np.float32:
+        denoised = denoised.astype(np.float32)
+    else:
+        denoised = denoised.astype(original_dtype)
+    
+    return denoised
+
 def pad_bg_value(image, size):
     # Ensure size is a tuple (new_h, new_w)
     if isinstance(size, int):

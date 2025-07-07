@@ -4,7 +4,7 @@ import os
 import json
 import numpy as np
 from PIL import Image
-from pre_proc import rgb_to_grayscale, negative_film, bg_subtr, contrast_stretching, apply_tukey_window, pad_bg_value
+from pre_proc import rgb_to_grayscale, negative_film, bg_subtr, contrast_stretching
 
 
 def load_ground_truth(data_dir):
@@ -132,14 +132,13 @@ def save_detailed_results(all_errors, folder_name, output_dir):
     # CSV format for easy analysis
     csv_path = os.path.join(output_dir, f'{folder_name}_detailed_results.csv')
     with open(csv_path, 'w') as f:
-        f.write('pair_id,pred_tx,pred_ty,pred_rot,gt_tx,gt_ty,gt_rot,tx_error,ty_error,translation_error,rotation_error\n')
+        f.write('pair_id,pred_tx,pred_ty,pred_rot,gt_tx,gt_ty,gt_rot,translation_error,rotation_error\n')
         for e in all_errors:
             pred = e['predicted']
             gt = e['ground_truth']
             f.write(f"{e['pair_id']},{pred['translation'][0]:.3f},{pred['translation'][1]:.3f},"
                    f"{pred['rotation']:.3f},{gt['translation'][0]:.3f},{gt['translation'][1]:.3f},"
-                   f"{gt['rotation']:.3f},{e['tx_error']:.3f},{e['ty_error']:.3f},"
-                   f"{e['translation_error']:.3f},{e['rotation_error']:.3f}\n")
+                   f"{gt['rotation']:.3f},{e['translation_error']:.3f},{e['rotation_error']:.3f}\n")
     
     print(f"Detailed results saved: {csv_path}")
 
