@@ -4,17 +4,18 @@ GEO-5010 Research Assignment: Historical Maps Image Registration Using DFT-based
 
 ### Folder structure (and how to use)
 ```
-├── data_eval.zip           # The exact same data used in the report
+├── data_eval.zip               # The exact same data used in the report
 ├── data_test.zip
-├── imreg_dft/              # The main package we're using
+├── imreg_dft/                  # The main package we're using
 ├── result_eval/
 ├── result_test/
-├── tiles/                  # map tiles' source files
-├── 0_dataset_generator.py  # to generate evaluation and test dataset
-├── 1_baseline_eval.py      # evaluate baseline model and create reports
-├── 2_baseline_test.py      # test baseline (or modified) model and create plots
-├── pre_proc.py             # pre-processing functions
-├── recrop.py               # util program to recrop the images to smaller size
+├── tiles/                      # map tiles' source files
+├── 0_dataset_generator.py      # to generate evaluation and test dataset
+├── 1_baseline_eval.py          # evaluate baseline model and create reports
+├── 2_baseline_test.py          # test baseline (or modified) model and create plots
+├── pre_proc.py                 # pre-processing functions
+├── recrop.py                   # util program to recrop the images to smaller size
+├── research_assignment_dft.pdf
 └── README.md
 ```
 
