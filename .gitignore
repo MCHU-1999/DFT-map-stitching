@@ -8,6 +8,7 @@ __pycache__/
 plots/
 data_eval/*
 data_test/*
+result_test/
 result_eval/**/*.png
 effect_demo_1.py
 effect_demo_2.py
